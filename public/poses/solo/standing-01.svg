@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 700" width="100%" height="100%">
+  <!-- Semi-transparent white silhouette placeholder -->
+  <g fill="none" stroke="rgba(255, 255, 255, 0.8)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Head -->
+    <circle cx="200" cy="150" r="30" />
+    <!-- Spine -->
+    <line x1="200" y1="180" x2="200" y2="350" />
+    <!-- Arms: hand on hip, other arm relaxed -->
+    <path d="M 200 200 L 140 250 L 160 320" /> 
+    <path d="M 200 200 L 260 260 L 260 340" />
+    <!-- Legs: one straight, one bent -->
+    <path d="M 200 350 L 170 500 L 170 650" />
+    <path d="M 200 350 L 240 480 L 220 630" />
+  </g>
+</svg>

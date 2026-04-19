@@ -1,65 +1,121 @@
-import Image from "next/image";
+'use client';
+import { useRef, useState, useEffect, useMemo } from 'react';
+import { PermissionGate } from '@/components/camera/PermissionGate';
+import { CameraView } from '@/components/camera/CameraView';
+import { PoseOverlay } from '@/components/camera/PoseOverlay';
+import { CaptureButton } from '@/components/camera/CaptureButton';
+import { OpacitySlider } from '@/components/camera/OpacitySlider';
+import { PoseCarousel } from '@/components/ui/PoseCarousel';
+import { CategoryTabs } from '@/components/ui/CategoryTabs';
+import { poses, Pose, PoseCategory } from '@/lib/poses';
+import { useGallery } from '@/hooks/useGallery';
+import Link from 'next/link';
+import { ImageIcon } from 'lucide-react';
 
-export default function Home() {
+export default function PoseCameraScreen() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { savePhoto } = useGallery();
+  
+  const [activeCategory, setActiveCategory] = useState<PoseCategory>('Solo');
+  const [selectedPose, setSelectedPose] = useState<Pose | null>(null);
+  const [opacity, setOpacity] = useState(50);
+  const [hasGranted, setHasGranted] = useState(false);
+  const [flash, setFlash] = useState(false);
+
+  // Initialize selected pose based on category if it changes and we don't have one selected for it
+  const filteredPoses = useMemo(() => {
+    return poses.filter(p => p.category === activeCategory);
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (filteredPoses.length > 0) {
+      setSelectedPose(filteredPoses[0]);
+    } else {
+      setSelectedPose(null);
+    }
+  }, [activeCategory, filteredPoses]);
+
+  const handleCapture = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    // UI Flash
+    setFlash(true);
+    setTimeout(() => setFlash(false), 200);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    // Set canvas dimensions to match video stream precisely
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // We draw exactly what the camera feed sees (which is raw from the device layer)
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Save as JPEG to IndexedDB
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    await savePhoto(dataUrl);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main className="relative h-[100dvh] w-full overflow-hidden bg-black text-white selection:bg-none">
+      <PermissionGate onGrant={() => setHasGranted(true)} isLoadingExt={false}>
+        {/* Core Camera Feed Backsplash */}
+        <CameraView videoRef={videoRef} />
+        
+        {/* Semi-transparent Overlay */}
+        <PoseOverlay pose={selectedPose} opacity={opacity} />
+
+        {/* Hidden Canvas for Capturing bytes */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Bottom Interactive UI Floating Panel */}
+        <div className="absolute inset-x-0 bottom-0 pb-10 pt-32 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col items-center justify-end z-20 pointer-events-none">
+          
+          <div className="w-full max-w-lg mx-auto flex flex-col gap-4">
+             {/* Opacity Control Top Header */}
+            <div className="flex justify-center w-full px-6 mb-1">
+              <OpacitySlider opacity={opacity} setOpacity={setOpacity} />
+            </div>
+
+            {/* Pose Selection Logic */}
+            <CategoryTabs 
+              categories={['Solo', 'Couple', 'Group', 'Portrait', 'Sitting']} 
+              active={activeCategory} 
+              onSelect={setActiveCategory} 
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            
+            <PoseCarousel 
+              poses={filteredPoses} 
+              selectedId={selectedPose?.id || null} 
+              onSelect={setSelectedPose} 
+            />
+
+            {/* Capture & Utility Buttons Footer */}
+            <div className="flex items-center justify-between px-10 mt-4 pointer-events-auto w-full">
+              {/* Gallery Navigate Button */}
+              <Link href="/gallery" className="p-4 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 active:scale-90 transition hover:bg-white/20 shadow-xl">
+                <ImageIcon className="w-6 h-6 text-white" />
+              </Link>
+              
+              {/* Centered Main Action */}
+              <CaptureButton onCapture={handleCapture} />
+              
+              {/* Spacer for strict center balancing */}
+              <div className="w-14 h-14" />
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Flash Effect on Image Tick */}
+        {flash && <div className="absolute inset-0 bg-white z-50 animate-flash pointer-events-none" />}
+      </PermissionGate>
+    </main>
   );
 }
